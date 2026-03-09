@@ -1,0 +1,191 @@
+# =============================================================================
+# Intelligent VM Migration Strategy - Experiment Configuration
+# =============================================================================
+# This file controls all experiment parameters for reproducibility.
+# Modify values here instead of hardcoding in source files.
+
+# --- Reproducibility ---
+random_seed: 42
+
+# --- Simulation Settings ---
+simulation:
+  num_hosts: 5
+  num_vms: 20
+  num_ticks: 50
+  output_csv: "data/vm_metrics.csv"
+
+  # Workload Pattern Configuration (increased ranges for more overloads)
+  workload:
+    pattern: "time_series"          # Options: "random", "time_series", "burst"
+    base_cpu_range: [30, 90]
+    base_ram_range: [25, 75]
+    base_network_range: [10, 60]
+
+    # Time-series sinusoidal parameters
+    time_series:
+      cpu_amplitude: 25.0           # Amplitude of CPU sine wave
+      cpu_period: 24                # Period in ticks (simulates 24h cycle)
+      ram_amplitude: 15.0
+      ram_period: 48
+      noise_stddev: 5.0             # Gaussian noise added on top
+
+    # Burst traffic parameters (increased for more overloads)
+    burst:
+      probability: 0.15            # Probability of burst per tick per VM (was 0.05)
+      cpu_spike_range: [25, 45]    # Additional CPU during burst
+      duration_ticks: 3            # How many ticks a burst lasts
+      cooldown_rate: 0.7           # Multiplier for gradual degradation
+
+  # Heterogeneous host capacities (reduced to trigger more overloads)
+  host_capacities:
+    - { host_id: "Host_1", cpu_capacity: 80,  ram_capacity: 128, overload_threshold: 85 }
+    - { host_id: "Host_2", cpu_capacity: 90,  ram_capacity: 256, overload_threshold: 85 }
+    - { host_id: "Host_3", cpu_capacity: 70,  ram_capacity: 64,  overload_threshold: 80 }
+    - { host_id: "Host_4", cpu_capacity: 85,  ram_capacity: 256, overload_threshold: 85 }
+    - { host_id: "Host_5", cpu_capacity: 95,  ram_capacity: 128, overload_threshold: 85 }
+
+# --- ML Model Settings ---
+model:
+  test_size: 0.2
+  feature_columns:
+    - "cpu"
+    - "ram"
+    - "network"
+    - "total_host_cpu"
+    - "total_host_ram"
+  label_column: "overloaded"
+  model_path: "model/trained_model.pkl"
+  scaler_path: "model/scaler.pkl"
+
+  # Random Forest settings
+  random_forest:
+    n_estimators: 100
+    max_depth: 10
+    min_samples_split: 5
+    min_samples_leaf: 2
+    n_jobs: -1
+
+    # GridSearchCV hyperparameter tuning
+    grid_search:
+      enabled: true
+      cv_folds: 5
+      param_grid:
+        n_estimators: [50, 100, 200]
+        max_depth: [5, 10, 15, null]
+        min_samples_split: [2, 5, 10]
+        min_samples_leaf: [1, 2, 4]
+
+  # LSTM settings
+  lstm:
+    enabled: true
+    sequence_length: 10
+    epochs: 50
+    batch_size: 32
+    hidden_units: 64
+    learning_rate: 0.001
+    dropout: 0.2
+    model_path: "model/lstm_model.h5"
+
+  # Cross-validation
+  cross_validation:
+    enabled: true
+    cv_folds: 5
+
+# --- Decision Engine Settings ---
+decision:
+  mode: "simulation"               # Options: "simulation", "aws"
+  strategy: "cost_aware"           # Options: "simple", "cost_aware"
+  migration_cost_penalty: 5.0      # Cost units per migration
+  sla_violation_weight: 10.0       # Weight for SLA violations in cost function
+  load_balance_weight: 2.0         # Weight for load balancing
+
+# --- Evaluation Settings ---
+evaluation:
+  sla_threshold: 90                # CPU % above which SLA is violated
+  energy:
+    p_idle: 100                    # Idle power consumption (watts)
+    p_max: 300                     # Max power consumption (watts)
+
+  # Advanced metrics
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1_score"
+    - "pr_auc"
+    - "roc_auc"
+    - "migration_overhead"
+    - "load_imbalance_variance"
+    - "energy_efficiency_score"
+
+# --- Reinforcement Learning ---
+reinforcement_learning:
+  enabled: true
+  algorithm: "q_learning"
+  episodes: 500
+  alpha: 0.1                       # Learning rate
+  gamma: 0.95                      # Discount factor
+  epsilon: 1.0                     # Initial exploration rate
+  epsilon_decay: 0.995
+  epsilon_min: 0.01
+  state_bins: 10                   # Discretization bins per feature
+
+# --- AWS Settings ---
+aws:
+  region: "us-east-1"
+  dry_run: true                    # Set false only with valid credentials
+  
+  # EC2 Instance Configuration
+  instance_type: "t2.micro"
+  ami_id: "ami-0c02fb55956c7d316"  # Amazon Linux 2 AMI (update for your region)
+  key_name: null                   # Optional: SSH key name
+  security_group_ids: []           # Optional: Security group IDs
+  subnet_id: null                  # Optional: Subnet ID (uses default VPC if null)
+  
+  # Instance Limits
+  max_instances: 10
+  min_instances: 2
+  
+  # Scaling Thresholds
+  scaling:
+    scale_out_threshold: 80        # CPU % to trigger scale-out
+    scale_in_threshold: 20         # CPU % to trigger scale-in
+    cooldown_seconds: 300          # Wait time between scaling actions
+    idle_terminate_minutes: 30     # Terminate instances idle this long
+  
+  # CloudWatch Settings
+  cloudwatch:
+    period: 300                    # Metric period in seconds (5 min)
+    history_minutes: 30            # How far back to fetch metrics
+    
+  # Live Pipeline Settings
+  pipeline:
+    poll_interval_seconds: 60      # How often to check metrics
+    prediction_threshold: 0.7      # Overload probability threshold
+    max_scale_per_iteration: 2     # Max instances to launch per iteration
+
+  # Legacy (kept for backward compatibility)
+  auto_scale_threshold: 85
+  auto_terminate_idle_minutes: 30
+
+# --- Dashboard ---
+dashboard:
+  backend: "streamlit"             # Options: "matplotlib", "streamlit"
+  streamlit_port: 8501
+  refresh_interval: 5              # Seconds between dashboard updates
+  output_dir: "dashboard"
+
+# --- Logging ---
+logging:
+  level: "INFO"                    # Options: DEBUG, INFO, WARNING, ERROR
+  log_file: "logs/vm_migration.log"
+  console_output: true
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+# --- Research Output ---
+research:
+  output_dir: "results"
+  generate_tables: true
+  table_format: "latex"            # Options: "latex", "markdown", "csv"
+  experiment_name: "VM_Migration_ML_v2"
+  author: "Research Team"
